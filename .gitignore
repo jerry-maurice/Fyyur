@@ -2,3 +2,4 @@ migrations
 node_modules
 .idea
 __pycache__
+.env

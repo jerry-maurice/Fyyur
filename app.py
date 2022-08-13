@@ -17,6 +17,7 @@ from flask_wtf import Form
 from sqlalchemy import distinct
 
 from forms import *
+from models import Artist, Show, Venue
 
 # ----------------------------------------------------------------------------#
 # App Config.
@@ -28,70 +29,6 @@ app.config.from_object('config')
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-
-# connect to a local postgresql database
-
-# ----------------------------------------------------------------------------#
-# Models.
-# ----------------------------------------------------------------------------#
-
-class Venue(db.Model):
-    __tablename__ = 'venue'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
-    city = db.Column(db.String(120), nullable=False)
-    state = db.Column(db.String(120), nullable=False)
-    address = db.Column(db.String(120), nullable=False)
-    phone = db.Column(db.String(120), nullable=True)
-    image_link = db.Column(db.String(500), nullable=True)
-    facebook_link = db.Column(db.String(120), nullable=True)
-    website = db.Column(db.String(500), nullable=True)
-    seeking_talent = db.Column(db.Boolean, default=False)
-    seeking_description = db.Column(db.TEXT(), nullable=True)
-    genres = db.Column(db.ARRAY(db.String))
-
-    # implement any missing fields, as a database migration using Flask-Migrate
-
-
-class Artist(db.Model):
-    __tablename__ = 'artist'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
-    city = db.Column(db.String(120), nullable=False)
-    state = db.Column(db.String(120), nullable=False)
-    phone = db.Column(db.String(120), nullable=True)
-    genres = db.Column(db.ARRAY(db.String), nullable=False)
-    image_link = db.Column(db.String(500), nullable=True)
-    facebook_link = db.Column(db.String(120), nullable=True)
-    website = db.Column(db.String(500), nullable=True)
-    looking_venues = db.Column(db.Boolean, default=False)
-    seeking_description = db.Column(db.TEXT(), nullable=True)
-
-    # implement any missing fields, as a database migration using Flask-Migrate
-
-
-'''
-class Genre(db.Model):
-    __tablename__ = "Genre"
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(250), nullable=True)
-    venue = db.Column(db.Integer, db.ForeignKey("Venue.id"), nullable=False)
-'''
-
-
-# Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
-class Show(db.Model):
-    __tablename__ = "show"
-
-    id = db.Column(db.Integer, primary_key=True)
-    venue_id = db.Column(db.ForeignKey("venue.id"), nullable=False)
-    artist_id = db.Column(db.ForeignKey("artist.id"), nullable=False)
-    start_time = db.Column(db.DateTime(), nullable=False)
-    venue = db.relationship("Venue", backref="show", lazy=True, cascade="all")
-    artist = db.relationship("Artist", backref="show", lazy=True, cascade="all")
 
 
 # ----------------------------------------------------------------------------#
@@ -124,7 +61,7 @@ def index():
 
 @app.route('/venues')
 def venues():
-    # replace with real venues data.
+    # Display venue data
     #       num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
     locations = db.session.query(distinct(Venue.city), Venue.state).order_by("state").all()
 
@@ -149,7 +86,7 @@ def venues():
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
-    # implement search on venues with partial string search. Ensure it is case-insensitive.
+    # implement search on venues with partial string search.
     # seach for Hop should return "The Musical Hop".
     # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
     request_data = request.form["search_term"]
@@ -173,13 +110,12 @@ def search_venues():
 @app.route('/venues/<int:venue_id>')
 def show_venue(venue_id):
     # shows the venue page with the given venue_id
-    # replace with real venue data from the venues table, using venue_id
     error = False
     if db.session.query(Venue.id).first() is not None:
         venue = Venue.query.get(venue_id)
         data = {
             **venue.__dict__,
-            "past_shows":[],
+            "past_shows": [],
             "upcoming_shows": [],
             "past_shows_count": 0,
             "upcoming_shows_count": 0,
@@ -187,12 +123,12 @@ def show_venue(venue_id):
         upcoming_shows = db.session.query(Show) \
             .join(Venue).filter(Show.venue_id == venue_id) \
             .filter(Show.start_time > datetime.now()) \
-            .order_by(Show.start_time)\
+            .order_by(Show.start_time) \
             .all()
         past_shows = db.session.query(Show) \
             .join(Venue).filter(Show.venue_id == venue_id) \
             .filter(Show.start_time < datetime.now()) \
-            .order_by(Show.start_time)\
+            .order_by(Show.start_time) \
             .all()
         past_shows_count = Show.query.filter_by(venue_id=venue_id).filter(Show.start_time < datetime.now()).count()
         upcoming_shows_count = Show.query.filter_by(venue_id=venue_id).filter(Show.start_time > datetime.now()).count()
@@ -268,11 +204,7 @@ def create_venue_submission():
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
-    # Complete this endpoint for taking a venue_id, and using
     # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
-
-    # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
-    # clicking that button delete it from the db then redirect the user to the homepage
     try:
         Venue.query.filter_by(id=venue_id).delete()
         db.session.commit()
@@ -287,7 +219,7 @@ def delete_venue(venue_id):
 #  ----------------------------------------------------------------
 @app.route('/artists')
 def artists():
-    # replace with real data returned from querying the database
+    # data of artists returned from querying the database
     data = []
     artists = Artist.query.all()
     for artist in artists:
@@ -331,7 +263,7 @@ def show_artist(artist_id):
         artist = Artist.query.get(artist_id)
         data = {
             **artist.__dict__,
-            "past_shows":[],
+            "past_shows": [],
             "upcoming_shows": [],
             "past_shows_count": 0,
             "upcoming_shows_count": 0,
@@ -339,12 +271,12 @@ def show_artist(artist_id):
         upcoming_shows = db.session.query(Show) \
             .join(Venue).filter(Show.artist_id == artist_id) \
             .filter(Show.start_time > datetime.now()) \
-            .order_by(Show.start_time)\
+            .order_by(Show.start_time) \
             .all()
         past_shows = db.session.query(Show) \
             .join(Venue).filter(Show.artist_id == artist_id) \
             .filter(Show.start_time < datetime.now()) \
-            .order_by(Show.start_time)\
+            .order_by(Show.start_time) \
             .all()
 
         past_shows_count = Show.query.filter_by(artist_id=artist_id).filter(

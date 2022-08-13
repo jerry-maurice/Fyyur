@@ -17,7 +17,7 @@ from flask_wtf import Form
 from sqlalchemy import distinct
 
 from forms import *
-from models import Artist, Show, Venue
+from models import Artist, Show, Venue, initialization
 
 # ----------------------------------------------------------------------------#
 # App Config.
@@ -25,9 +25,10 @@ from models import Artist, Show, Venue
 
 app = Flask(__name__)
 moment = Moment(app)
-app.config.from_object('config')
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
+db = initialization(app)
+#app.config.from_object('config')
+#db = SQLAlchemy(app)
+#migrate = Migrate(app, db)
 
 
 

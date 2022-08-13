@@ -1,6 +1,17 @@
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
+
+
+def initialization(app):
+    app.config.from_object('config')
+    db.app = app
+    db.init_app(app)
+    migrate = Migrate(app, db)
+    return db
+
+
 # ----------------------------------------------------------------------------#
 # Models.
 # ----------------------------------------------------------------------------#
@@ -42,7 +53,6 @@ class Artist(db.Model):
     website = db.Column(db.String(500), nullable=True)
     looking_venues = db.Column(db.Boolean, default=False)
     seeking_description = db.Column(db.TEXT(), nullable=True)
-
 
 
 class Show(db.Model):

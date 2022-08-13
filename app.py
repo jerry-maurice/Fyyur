@@ -90,6 +90,8 @@ class Show(db.Model):
     venue_id = db.Column(db.ForeignKey("venue.id"), nullable=False)
     artist_id = db.Column(db.ForeignKey("artist.id"), nullable=False)
     start_time = db.Column(db.DateTime(), nullable=False)
+    venue = db.relationship("Venue", backref="show", lazy=True, cascade="all")
+    artist = db.relationship("Artist", backref="show", lazy=True, cascade="all")
 
 
 # ----------------------------------------------------------------------------#
@@ -172,36 +174,49 @@ def search_venues():
 def show_venue(venue_id):
     # shows the venue page with the given venue_id
     # replace with real venue data from the venues table, using venue_id
-    data = {}
     error = False
     if db.session.query(Venue.id).first() is not None:
         venue = Venue.query.get(venue_id)
-        upcoming_shows = []
-        past_shows = []
-        shows = Show.query.filter_by(venue_id=venue_id).all()
+        data = {
+            **venue.__dict__,
+            "past_shows":[],
+            "upcoming_shows": [],
+            "past_shows_count": 0,
+            "upcoming_shows_count": 0,
+        }
+        upcoming_shows = db.session.query(Show) \
+            .join(Venue).filter(Show.venue_id == venue_id) \
+            .filter(Show.start_time > datetime.now()) \
+            .order_by(Show.start_time)\
+            .all()
+        past_shows = db.session.query(Show) \
+            .join(Venue).filter(Show.venue_id == venue_id) \
+            .filter(Show.start_time < datetime.now()) \
+            .order_by(Show.start_time)\
+            .all()
         past_shows_count = Show.query.filter_by(venue_id=venue_id).filter(Show.start_time < datetime.now()).count()
         upcoming_shows_count = Show.query.filter_by(venue_id=venue_id).filter(Show.start_time > datetime.now()).count()
 
-        for s in shows:
-            artist = Artist.query.get(s.artist_id)
+        for s in upcoming_shows:
             listed = {
-                "artist_id": artist.id,
-                "artist_name": artist.name,
-                "artist_image_link": artist.image_link,
+                "artist_id": s.artist.id,
+                "artist_name": s.artist.name,
+                "artist_image_link": s.artist.image_link,
                 "start_time": str(s.start_time)
             }
-            if s.start_time < datetime.now():
-                past_shows.append(listed)
-            else:
-                upcoming_shows.append(listed)
+            data["upcoming_shows"].append(listed)
 
-        data = {
-            **venue.__dict__,
-            "past_shows": past_shows,
-            "upcoming_shows": upcoming_shows,
-            "past_shows_count": past_shows_count,
-            "upcoming_shows_count": upcoming_shows_count,
-        }
+        for s in past_shows:
+            listed = {
+                "artist_id": s.artist.id,
+                "artist_name": s.artist.name,
+                "artist_image_link": s.artist.image_link,
+                "start_time": str(s.start_time)
+            }
+            data["past_shows"].append(listed)
+
+        data["past_shows_count"] = past_shows_count
+        data["upcoming_shows_count"] = upcoming_shows_count
     else:
         error = True
 
@@ -311,37 +326,54 @@ def search_artists():
 def show_artist(artist_id):
     # shows the artist page with the given artist_id
     # replace with real artist data from the artist table, using artist_id
-    data = {}
     error = False
     if db.session.query(Artist.id).first() is not None:
         artist = Artist.query.get(artist_id)
-        upcoming_shows = []
-        past_shows = []
-        shows = Show.query.filter_by(artist_id=artist_id).all()
-        past_shows_count = Show.query.filter_by(artist_id=artist_id).filter(Show.start_time < datetime.now()).count()
-        upcoming_shows_count = Show.query.filter_by(artist_id=artist_id).filter(
-            Show.start_time > datetime.now()).count()
-        print(artist)
-        for s in shows:
-            venue = Venue.query.get(s.venue_id)
-            listed = {
-                "venue_id": venue.id,
-                "venue_name": venue.name,
-                "venue_image_link": venue.image_link,
-                "start_time": str(s.start_time)
-            }
-            if s.start_time < datetime.now():
-                past_shows.append(listed)
-            else:
-                upcoming_shows.append(listed)
-
         data = {
             **artist.__dict__,
-            "past_shows": past_shows,
-            "upcoming_shows": upcoming_shows,
-            "past_shows_count": past_shows_count,
-            "upcoming_shows_count": upcoming_shows_count,
+            "past_shows":[],
+            "upcoming_shows": [],
+            "past_shows_count": 0,
+            "upcoming_shows_count": 0,
         }
+        upcoming_shows = db.session.query(Show) \
+            .join(Venue).filter(Show.artist_id == artist_id) \
+            .filter(Show.start_time > datetime.now()) \
+            .order_by(Show.start_time)\
+            .all()
+        past_shows = db.session.query(Show) \
+            .join(Venue).filter(Show.artist_id == artist_id) \
+            .filter(Show.start_time < datetime.now()) \
+            .order_by(Show.start_time)\
+            .all()
+
+        past_shows_count = Show.query.filter_by(artist_id=artist_id).filter(
+            Show.start_time < datetime.now()
+        ).count()
+        upcoming_shows_count = Show.query.filter_by(artist_id=artist_id).filter(
+            Show.start_time > datetime.now()
+        ).count()
+
+        for s in upcoming_shows:
+            listed = {
+                "venue_id": s.venue.id,
+                "venue_name": s.venue.name,
+                "venue_image_link": s.venue.image_link,
+                "start_time": str(s.start_time)
+            }
+            data["upcoming_shows"].append(listed)
+
+        for s in past_shows:
+            listed = {
+                "venue_id": s.venue.id,
+                "venue_name": s.venue.name,
+                "venue_image_link": s.venue.image_link,
+                "start_time": str(s.start_time)
+            }
+            data["past_shows"].append(listed)
+
+        data["past_shows_count"] = past_shows_count
+        data["upcoming_shows_count"] = upcoming_shows_count
     else:
         error = True
 
@@ -358,9 +390,10 @@ def edit_artist(artist_id):
     # populate form with fields from artist with ID <artist_id>
     artist = Artist.query.get(artist_id)
     form = ArtistForm(id=artist.id, name=artist.name, genres=artist.genres, city=artist.city,
-                     state=artist.state, phone=artist.phone, website_link=artist.website, facebook_link=artist.facebook_link,
-                     seeking_venue=artist.looking_venues, seeking_description=artist.seeking_description,
-                     image_link=artist.image_link)
+                      state=artist.state, phone=artist.phone, website_link=artist.website,
+                      facebook_link=artist.facebook_link,
+                      seeking_venue=artist.looking_venues, seeking_description=artist.seeking_description,
+                      image_link=artist.image_link)
 
     return render_template('forms/edit_artist.html', form=form, artist=artist)
 
@@ -400,7 +433,8 @@ def edit_venue(venue_id):
     # populate form with values from venue with ID <venue_id>
     venue = Venue.query.get(venue_id)
     form = VenueForm(id=venue.id, name=venue.name, genres=venue.genres, address=venue.address, city=venue.city,
-                     state=venue.state, phone=venue.phone, website_link=venue.website, facebook_link=venue.facebook_link,
+                     state=venue.state, phone=venue.phone, website_link=venue.website,
+                     facebook_link=venue.facebook_link,
                      seeking_talent=venue.seeking_talent, seeking_description=venue.seeking_description,
                      image_link=venue.image_link)
     return render_template('forms/edit_venue.html', form=form, venue=venue)
@@ -413,7 +447,7 @@ def edit_venue_submission(venue_id):
     form = VenueForm(request.form)
     print(form.website_link.data)
     try:
-        db.session.query(Venue).filter(Venue.id==venue_id).update({
+        db.session.query(Venue).filter(Venue.id == venue_id).update({
             "name": form.name.data,
             "city": form.city.data,
             "state": form.state.data,
